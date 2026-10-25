@@ -1,0 +1,20 @@
+# Works with `docker compose up` locally and as a TrueNAS SCALE custom app (YAML).
+# On TrueNAS: build the image on the host first and delete the `build:` line
+# (see README, "Deploying on TrueNAS").
+services:
+  actual-importer:
+    build: .
+    image: actual-importer:latest
+    restart: unless-stopped
+    ports:
+      - "3010:3000"
+    environment:
+      ACTUAL_SERVER_URL: ${ACTUAL_SERVER_URL:-https://budget.example.com}
+      ACTUAL_PASSWORD: ${ACTUAL_PASSWORD:?set ACTUAL_PASSWORD in .env}
+      ACTUAL_SYNC_ID: ${ACTUAL_SYNC_ID:?set ACTUAL_SYNC_ID in .env}
+      ACTUAL_E2E_PASSWORD: ${ACTUAL_E2E_PASSWORD:-}
+      ACTUAL_DATA_DIR: /data/actual-cache
+      PORT: "3000"
+    volumes:
+      # Holds accounts.json and Actual's local cache. Must be writable by UID 568.
+      - ${DATA_PATH:-./data}:/data

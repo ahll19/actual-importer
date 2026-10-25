@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+data/
+# Real account mapping lives on the server volume, never in the repo
+/accounts.json
+*.log
+.DS_Store

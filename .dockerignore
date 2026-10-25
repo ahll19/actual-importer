@@ -1,0 +1,10 @@
+node_modules
+dist
+data
+.env
+.git
+*.md
+*.py
+test
+scripts
+accounts.json

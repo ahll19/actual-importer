@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bank import</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1d2330; --muted: #667085; --border: #dde1e7;
+    --accent: #6941c6; --ok: #067647; --warn: #b54708; --warn-bg: #fffaeb; --err: #b42318; --err-bg: #fef3f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12141a; --card: #1b1e26; --text: #e6e8ec; --muted: #98a2b3; --border: #2e3340;
+      --accent: #9e77ed; --ok: #47cd89; --warn: #fdb022; --warn-bg: #2b2111; --err: #f97066; --err-bg: #2d1414;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 16px; }
+  h2 { font-size: 17px; margin: 0 0 4px; }
+  .muted { color: var(--muted); }
+  #drop {
+    display: block; border: 2px dashed var(--border); border-radius: 12px; padding: 40px 16px; text-align: center;
+    background: var(--card); cursor: pointer;
+  }
+  #drop.over { border-color: var(--accent); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 16px; }
+  .counts { display: flex; flex-wrap: wrap; gap: 16px; margin: 8px 0; }
+  .counts b { font-size: 18px; display: block; }
+  .error { background: var(--err-bg); color: var(--err); border-radius: 8px; padding: 10px 12px; margin-top: 8px; }
+  .warning { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 10px 12px; margin-top: 8px; }
+  .ok { color: var(--ok); }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  td.num, th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  td.date { white-space: nowrap; }
+  .scroll { overflow-x: auto; }
+  pre { white-space: pre-wrap; word-break: break-all; margin: 2px 0 0; font-size: 12px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 16px; }
+  button { font: inherit; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  details summary { cursor: pointer; margin-top: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Import bank transactions into Actual</h1>
+  <label id="drop">
+    <input id="file" type="file" accept=".csv" hidden>
+    <strong>Drop a Netbank CSV export here</strong><br>
+    <span class="muted">or click to choose a file</span>
+  </label>
+  <div id="status"></div>
+  <div id="result"></div>
+</main>
+
+<script>
+  const $ = (sel) => document.querySelector(sel);
+  const drop = $('#drop'), fileInput = $('#file'), statusEl = $('#status'), resultEl = $('#result');
+  let currentToken = null;
+
+  const money = new Intl.NumberFormat('da-DK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (ore) => money.format(ore / 100);
+
+  // Small DOM helper: el('td', {class: 'num'}, 'text', childEl, ...). Text is
+  // always set via textContent, so bank text can never inject HTML.
+  function el(tag, attrs, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === 'class') node.className = v; else node.setAttribute(k, v);
+    }
+    for (const c of children.flat()) {
+      if (c == null || c === false) continue;
+      node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+    }
+    return node;
+  }
+
+  function setStatus(text, cls) {
+    statusEl.replaceChildren(text ? el('div', { class: cls || 'card muted' }, text) : '');
+  }
+
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault(); drop.classList.remove('over');
+    if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) upload(fileInput.files[0]); fileInput.value = ''; });
+
+  async function upload(file) {
+    currentToken = null;
+    resultEl.replaceChildren();
+    setStatus(`Checking ${file.name} against Actual…`);
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const res = await fetch('preview', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) return setStatus(data.error || `Upload failed (${res.status})`, 'error');
+      setStatus('');
+      currentToken = data.token;
+      renderPreview(data);
+    } catch (err) {
+      setStatus(`Upload failed: ${err.message}`, 'error');
+    }
+  }
+
+  function renderPreview(data) {
+    const sections = data.accounts.map((a) => accountSection(a, true));
+    if (data.unassignedRejects.length) {
+      sections.push(el('div', { class: 'card' },
+        el('h2', {}, 'Rejected lines (account unknown)'),
+        rejectList(data.unassignedRejects)));
+    }
+
+    const toAdd = data.accounts.reduce((n, a) => n + (a.error ? 0 : a.added + a.updated), 0);
+    const hasWarnings = data.accounts.some((a) => !a.error && a.warnings.length);
+    const importBtn = el('button', { class: 'primary' }, toAdd ? `Import ${toAdd} transaction(s)` : 'Nothing to import');
+    const cancelBtn = el('button', {}, 'Cancel');
+    const check = el('input', { type: 'checkbox' });
+    const ack = hasWarnings ? el('label', {}, check, " I've checked the warnings") : null;
+    const refresh = () => { importBtn.disabled = !toAdd || (hasWarnings && !check.checked); };
+    check.addEventListener('change', refresh);
+    refresh();
+
+    cancelBtn.addEventListener('click', () => { currentToken = null; resultEl.replaceChildren(); setStatus(''); });
+    importBtn.addEventListener('click', async () => {
+      importBtn.disabled = cancelBtn.disabled = true;
+      setStatus('Importing…');
+      try {
+        const res = await fetch('import', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ token: currentToken }),
+        });
+        const result = await res.json();
+        if (!res.ok) { setStatus(result.error || `Import failed (${res.status})`, 'error'); importBtn.disabled = cancelBtn.disabled = false; return; }
+        currentToken = null;
+        setStatus('');
+        renderResult(result);
+      } catch (err) {
+        setStatus(`Import failed: ${err.message}`, 'error');
+        importBtn.disabled = cancelBtn.disabled = false;
+      }
+    });
+
+    resultEl.replaceChildren(
+      el('h2', { style: 'margin-top:24px' }, `Preview: ${data.filename}`),
+      el('p', { class: 'muted' }, 'Nothing has been imported yet.'),
+      ...sections,
+      el('div', { class: 'actions' }, importBtn, cancelBtn, ack),
+    );
+  }
+
+  function renderResult(data) {
+    const again = el('button', {}, 'Import another file');
+    again.addEventListener('click', () => { resultEl.replaceChildren(); fileInput.click(); });
+    resultEl.replaceChildren(
+      el('h2', { style: 'margin-top:24px' }, `Imported: ${data.filename}`),
+      ...data.accounts.map((a) => accountSection(a, false)),
+      el('div', { class: 'actions' }, again),
+    );
+  }
+
+  function accountSection(a, isPreview) {
+    const title = a.actualAccount ? `${a.actualAccount}` : 'Unmapped account';
+    const card = el('div', { class: 'card' },
+      el('h2', {}, title),
+      el('div', { class: 'muted' }, `Bank account ${a.bankAccount}` +
+        (a.rowCount ? ` · ${a.rowCount} rows · ${a.dateFrom} to ${a.dateTo}` : '')));
+
+    if (a.error) {
+      card.append(el('div', { class: 'error' }, a.error, ' Nothing from this account will be imported.'));
+    } else {
+      card.append(el('div', { class: 'counts' },
+        count(isPreview ? 'to add' : 'added', a.added, 'ok'),
+        count('already imported', a.alreadyImported),
+        count(isPreview ? 'to update' : 'updated', a.updated)));
+    }
+    for (const e of a.errors) card.append(el('div', { class: 'error' }, e));
+    for (const w of a.warnings) {
+      card.append(el('div', { class: 'warning' },
+        `Balance jump at line ${w.lineNo} (${w.date}): expected ${fmt(w.expectedBalance)}, bank says ${fmt(w.actualBalance)}. ` +
+        'Rows are probably missing from the export before this line.'));
+    }
+    if (a.rejects.length) {
+      card.append(el('div', { class: 'error' }, `${a.rejects.length} line(s) rejected and will not be imported:`, rejectList(a.rejects)));
+    }
+    if (!a.error && a.rowsToAdd.length) {
+      card.append(el('details', { open: '' },
+        el('summary', {}, isPreview ? 'Rows to add' : 'Rows added'),
+        el('div', { class: 'scroll' }, el('table', {},
+          el('thead', {}, el('tr', {}, el('th', {}, 'Date'), el('th', {}, 'Payee'), el('th', { class: 'num' }, 'Amount'), el('th', {}, 'Notes'))),
+          el('tbody', {}, a.rowsToAdd.map((r) => el('tr', {},
+            el('td', { class: 'date' }, r.date), el('td', {}, r.payee),
+            el('td', { class: 'num' }, fmt(r.amount)), el('td', {}, r.notes))))))));
+    }
+    return card;
+  }
+
+  function count(label, n, cls) {
+    return el('div', {}, el('b', { class: n ? (cls || '') : 'muted' }, n), el('span', { class: 'muted' }, label));
+  }
+
+  function rejectList(rejects) {
+    return el('table', {}, el('tbody', {}, rejects.map((r) => el('tr', {},
+      el('td', { class: 'num' }, `line ${r.lineNo}`),
+      el('td', {}, r.reason, el('pre', {}, r.raw))))));
+  }
+</script>
+</body>
+</html>

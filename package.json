@@ -1,0 +1,29 @@
+{
+  "name": "actual-importer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LAN web page that imports BEC Netbank CSV exports into Actual Budget",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dry-run": "tsx scripts/dry-run.ts"
+  },
+  "dependencies": {
+    "@actual-app/api": "26.10.0",
+    "@fastify/multipart": "^10.1.6",
+    "fastify": "^5.12.7",
+    "iconv-lite": "^0.7.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

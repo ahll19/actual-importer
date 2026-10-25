@@ -1,0 +1,142 @@
+// HTTP routes.
+//
+// Fastify rather than Express: it has upload size limits, JSON body parsing and
+// a structured logger built in, so there is less glue code to maintain.
+
+import { readFileSync } from 'node:fs';
+import Fastify, { LogController, type FastifyInstance } from 'fastify';
+import multipart from '@fastify/multipart';
+import { loadAccountMap } from './accounts.js';
+import { BatchStore } from './batches.js';
+import { runBatch, type ActualApi, type BatchReport } from './importer.js';
+import { parseBecCsv, UploadError, type ParseResult } from './parser.js';
+
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+/** What the routes need from the Actual connection (ActualClient, or a fake in tests). */
+export interface BudgetRunner {
+  withBudget<T>(fn: (api: ActualApi) => Promise<T>, opts?: { syncAfter?: boolean }): Promise<T>;
+  lastConnectionOk: boolean;
+}
+
+export interface AppOptions {
+  actual: BudgetRunner;
+  accountsFile: string;
+  store?: BatchStore<Batch>;
+  logger?: boolean;
+}
+
+/**
+ * Turns off Fastify's "incoming request" / "request completed" lines: we write
+ * one summary line per preview/import instead, and must never log transaction
+ * text, amounts or account numbers. Unexpected errors are still logged.
+ */
+class QuietRequests extends LogController {
+  override incomingRequest(): void {}
+  override requestCompleted(...args: Parameters<LogController['requestCompleted']>): void {
+    if (args[0]) super.requestCompleted(...args);
+  }
+}
+
+interface Batch {
+  filename: string;
+  parsed: ParseResult;
+}
+
+const indexHtml = readFileSync(new URL('../public/index.html', import.meta.url));
+
+export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
+  const { actual, accountsFile } = opts;
+  const store = opts.store ?? new BatchStore<Batch>();
+
+  const app = Fastify({ logger: opts.logger ?? true, logController: new QuietRequests() });
+  await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
+
+  app.get('/', async (_req, reply) => reply.type('text/html; charset=utf-8').send(indexHtml));
+
+  app.get('/healthz', async (_req, reply) =>
+    actual.lastConnectionOk ? { ok: true } : reply.code(503).send({ ok: false }),
+  );
+
+  app.post('/preview', async (req, reply) => {
+    const started = Date.now();
+    let file;
+    try {
+      file = await req.file();
+    } catch {
+      return reply.code(400).send({ error: 'Expected a multipart file upload.' });
+    }
+    if (!file) return reply.code(400).send({ error: 'No file uploaded.' });
+    if (!file.filename.toLowerCase().endsWith('.csv')) {
+      return reply.code(400).send({ error: 'Only .csv files are accepted.' });
+    }
+
+    let bytes: Buffer;
+    try {
+      bytes = await file.toBuffer();
+    } catch (err) {
+      if (err instanceof app.multipartErrors.RequestFileTooLargeError) {
+        return reply.code(413).send({ error: 'File is larger than 5 MB.' });
+      }
+      throw err;
+    }
+
+    let parsed: ParseResult;
+    try {
+      parsed = parseBecCsv(bytes);
+    } catch (err) {
+      if (err instanceof UploadError) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
+
+    let report: BatchReport;
+    try {
+      const accountMap = await loadAccountMap(accountsFile);
+      report = await actual.withBudget((api) => runBatch(api, parsed, accountMap, true));
+    } catch (err) {
+      req.log.error(`preview failed: ${(err as Error).message}`);
+      return reply.code(502).send({ error: (err as Error).message });
+    }
+
+    const token = store.put({ filename: file.filename, parsed });
+    req.log.info(`preview: ${summary(report)}, ${Date.now() - started} ms`);
+    return { token, filename: file.filename, ...report };
+  });
+
+  app.post<{ Body: { token?: unknown } }>('/import', async (req, reply) => {
+    const started = Date.now();
+    const token = req.body?.token;
+    const batch = typeof token === 'string' ? store.get(token) : undefined;
+    if (!batch) {
+      return reply.code(410).send({ error: 'This preview has expired (15 minutes) or was already imported. Upload the file again.' });
+    }
+
+    let report: BatchReport;
+    try {
+      // Same parsed batch as the preview; the file is not parsed again.
+      const accountMap = await loadAccountMap(accountsFile);
+      report = await actual.withBudget((api) => runBatch(api, batch.parsed, accountMap, false), { syncAfter: true });
+    } catch (err) {
+      req.log.error(`import failed: ${(err as Error).message}`);
+      return reply.code(502).send({ error: (err as Error).message });
+    }
+
+    store.delete(token as string);
+    req.log.info(`import: ${summary(report)}, ${Date.now() - started} ms`);
+    return { filename: batch.filename, ...report };
+  });
+
+  return app;
+}
+
+/** Log-safe summary: Actual account names and counts only. */
+function summary(report: BatchReport): string {
+  const parts = report.accounts.map((a) =>
+    a.error
+      ? `${a.actualAccount ?? 'unmapped account'}: failed`
+      : `${a.actualAccount}: ${a.rowCount} rows, +${a.added} added, ${a.updated} updated, ${a.alreadyImported} skipped, ` +
+        `${a.rejects.length} rejected, ${a.warnings.length} warnings, ${a.errors.length} errors`,
+  );
+  if (report.unassignedRejects.length) parts.push(`${report.unassignedRejects.length} unassigned rejects`);
+  return parts.join('; ') || 'no accounts';
+}
