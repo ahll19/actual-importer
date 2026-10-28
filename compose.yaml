@@ -1,15 +1,17 @@
-# Works with `docker compose up` locally and as a TrueNAS SCALE custom app (YAML).
-# On TrueNAS: build the image on the host first and delete the `build:` line
-# (see README, "Deploying on TrueNAS").
+# Used as-is both locally (`docker compose up --build`) and as a Dockge stack
+# (the repo is cloned into Dockge's stacks folder; see README).
+# Values in ${...} come from the .env file next to this file.
 services:
   actual-importer:
     build: .
     image: actual-importer:latest
+    # The image is built from this folder, never pulled from a registry.
+    pull_policy: build
     restart: unless-stopped
     ports:
       - "3010:3000"
     environment:
-      ACTUAL_SERVER_URL: ${ACTUAL_SERVER_URL:-https://budget.example.com}
+      ACTUAL_SERVER_URL: ${ACTUAL_SERVER_URL:?set ACTUAL_SERVER_URL in .env}
       ACTUAL_PASSWORD: ${ACTUAL_PASSWORD:?set ACTUAL_PASSWORD in .env}
       ACTUAL_SYNC_ID: ${ACTUAL_SYNC_ID:?set ACTUAL_SYNC_ID in .env}
       ACTUAL_E2E_PASSWORD: ${ACTUAL_E2E_PASSWORD:-}
@@ -17,4 +19,6 @@ services:
       PORT: "3000"
     volumes:
       # Holds accounts.json and Actual's local cache. Must be writable by UID 568.
-      - ${DATA_PATH:-./data}:/data
+      # `:z` lets the container use the folder on SELinux hosts (e.g. Fedora);
+      # it does nothing elsewhere.
+      - ${DATA_PATH:-./data}:/data:z

@@ -1,10 +1,11 @@
 // Parser for BEC Netbank CSV exports.
 //
-// Ported from the Python reference parser (bec2actual.py). The export is not
-// valid CSV: quotes inside fields are not escaped (e.g. `""EKSEMPEL""`), so we
-// deliberately do NOT use a CSV library. Each line is split on `;` and every
-// field is cleaned by hand. A line with the wrong number of fields is rejected
-// rather than guessed at.
+// Ported from the Python reference parser (bec2actual.py, in the appendix of
+// .archive/actual-csv-importer-spec.md). The export is not valid CSV: quotes
+// inside fields are not escaped (e.g. `""EKSEMPEL""`), so we deliberately do NOT
+// use a CSV library. Each line is split on `;` and every field is cleaned by
+// hand. A line with the wrong number of fields is rejected rather than guessed
+// at.
 
 import iconv from 'iconv-lite';
 

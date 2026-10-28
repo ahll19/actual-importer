@@ -4,5 +4,7 @@ dist/
 data/
 # Real account mapping lives on the server volume, never in the repo
 /accounts.json
+# Private notes for Claude (real hostnames etc.), never committed
+CLAUDE.local.md
 *.log
 .DS_Store

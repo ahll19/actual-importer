@@ -24,7 +24,8 @@ COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY public ./public
-# 568:568 is TrueNAS SCALE's "apps" user, so files on the host volume line up.
+# Fixed non-root UID/GID (568 is the "apps" user on TrueNAS SCALE). The data
+# folder on the host must be writable by it.
 USER 568:568
 EXPOSE 3000
 HEALTHCHECK --interval=60s --timeout=5s --start-period=30s \
