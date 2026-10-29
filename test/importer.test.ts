@@ -66,14 +66,14 @@ describe('runBatch', () => {
     const byBank = Object.fromEntries(report.accounts.map((a) => [a.bankAccount, a]));
     expect(byBank[ACCOUNT].error).toBeNull();
     expect(byBank[ACCOUNT].added).toBe(1);
-    expect(byBank[OTHER].error).toMatch(/no account named "Opsparing"/);
-    expect(byBank['99990000111122'].error).toMatch(/No mapping/);
+    expect(byBank[OTHER].error).toMatch(/ingen konto med navnet "Opsparing"/);
+    expect(byBank['99990000111122'].error).toMatch(/ikke knyttet/);
   });
 
   it('refuses a closed Actual account', async () => {
     const batch = parseBecCsv(file(HEADER, ROW1));
     const report = await runBatch(fakeApi(), batch, { [ACCOUNT]: 'Gammel' }, true);
-    expect(report.accounts[0].error).toMatch(/closed/);
+    expect(report.accounts[0].error).toMatch(/lukket/);
   });
 
   it('puts rejects under their account, or in the unassigned list', async () => {

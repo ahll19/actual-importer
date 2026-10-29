@@ -11,7 +11,7 @@ export async function loadAccountMap(path: string): Promise<AccountMap> {
     text = await readFile(path, 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw new Error(`Account mapping file not found: ${path}. Copy accounts.example.json there and edit it.`);
+      throw new Error(`Kontofilen findes ikke: ${path}. Kopiér accounts.example.json dertil og ret den til.`);
     }
     throw err;
   }
@@ -20,13 +20,13 @@ export async function loadAccountMap(path: string): Promise<AccountMap> {
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error(`${path} is not valid JSON.`);
+    throw new Error(`${path} er ikke gyldig JSON.`);
   }
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-    throw new Error(`${path} must be a JSON object like {"<bank account number>": "<Actual account name>"}.`);
+    throw new Error(`${path} skal være et JSON-objekt som {"<bankkontonummer>": "<navn på Actual-konto>"}.`);
   }
   for (const value of Object.values(data)) {
-    if (typeof value !== 'string') throw new Error(`${path}: every value must be an Actual account name (a string).`);
+    if (typeof value !== 'string') throw new Error(`${path}: hver værdi skal være navnet på en Actual-konto (en tekst).`);
   }
   return data as AccountMap;
 }

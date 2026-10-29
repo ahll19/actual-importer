@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="da">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bank import</title>
+<title>Bankimport</title>
 <style>
   :root {
     --bg: #f6f7f9; --card: #fff; --text: #1d2330; --muted: #667085; --border: #dde1e7;
@@ -47,11 +47,11 @@
 </head>
 <body>
 <main>
-  <h1>Import bank transactions into Actual</h1>
+  <h1>Importér banktransaktioner til Actual</h1>
   <label id="drop">
     <input id="file" type="file" accept=".csv" hidden>
-    <strong>Drop a Netbank CSV export here</strong><br>
-    <span class="muted">or click to choose a file</span>
+    <strong>Træk en CSV-eksport fra Netbank hertil</strong><br>
+    <span class="muted">eller klik for at vælge en fil</span>
   </label>
   <div id="status"></div>
   <div id="result"></div>
@@ -94,18 +94,18 @@
   async function upload(file) {
     currentToken = null;
     resultEl.replaceChildren();
-    setStatus(`Checking ${file.name} against Actual…`);
+    setStatus(`Tjekker ${file.name} mod Actual…`);
     const form = new FormData();
     form.append('file', file);
     try {
       const res = await fetch('preview', { method: 'POST', body: form });
       const data = await res.json();
-      if (!res.ok) return setStatus(data.error || `Upload failed (${res.status})`, 'error');
+      if (!res.ok) return setStatus(data.error || `Upload mislykkedes (${res.status})`, 'error');
       setStatus('');
       currentToken = data.token;
       renderPreview(data);
     } catch (err) {
-      setStatus(`Upload failed: ${err.message}`, 'error');
+      setStatus(`Upload mislykkedes: ${err.message}`, 'error');
     }
   }
 
@@ -113,16 +113,16 @@
     const sections = data.accounts.map((a) => accountSection(a, true));
     if (data.unassignedRejects.length) {
       sections.push(el('div', { class: 'card' },
-        el('h2', {}, 'Rejected lines (account unknown)'),
+        el('h2', {}, 'Afviste linjer (ukendt konto)'),
         rejectList(data.unassignedRejects)));
     }
 
     const toAdd = data.accounts.reduce((n, a) => n + (a.error ? 0 : a.added + a.updated), 0);
     const hasWarnings = data.accounts.some((a) => !a.error && a.warnings.length);
-    const importBtn = el('button', { class: 'primary' }, toAdd ? `Import ${toAdd} transaction(s)` : 'Nothing to import');
-    const cancelBtn = el('button', {}, 'Cancel');
+    const importBtn = el('button', { class: 'primary' }, toAdd ? `Importér ${toAdd} transaktion(er)` : 'Intet at importere');
+    const cancelBtn = el('button', {}, 'Annullér');
     const check = el('input', { type: 'checkbox' });
-    const ack = hasWarnings ? el('label', {}, check, " I've checked the warnings") : null;
+    const ack = hasWarnings ? el('label', {}, check, ' Jeg har tjekket advarslerne') : null;
     const refresh = () => { importBtn.disabled = !toAdd || (hasWarnings && !check.checked); };
     check.addEventListener('change', refresh);
     refresh();
@@ -130,70 +130,70 @@
     cancelBtn.addEventListener('click', () => { currentToken = null; resultEl.replaceChildren(); setStatus(''); });
     importBtn.addEventListener('click', async () => {
       importBtn.disabled = cancelBtn.disabled = true;
-      setStatus('Importing…');
+      setStatus('Importerer…');
       try {
         const res = await fetch('import', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ token: currentToken }),
         });
         const result = await res.json();
-        if (!res.ok) { setStatus(result.error || `Import failed (${res.status})`, 'error'); importBtn.disabled = cancelBtn.disabled = false; return; }
+        if (!res.ok) { setStatus(result.error || `Import mislykkedes (${res.status})`, 'error'); importBtn.disabled = cancelBtn.disabled = false; return; }
         currentToken = null;
         setStatus('');
         renderResult(result);
       } catch (err) {
-        setStatus(`Import failed: ${err.message}`, 'error');
+        setStatus(`Import mislykkedes: ${err.message}`, 'error');
         importBtn.disabled = cancelBtn.disabled = false;
       }
     });
 
     resultEl.replaceChildren(
-      el('h2', { style: 'margin-top:24px' }, `Preview: ${data.filename}`),
-      el('p', { class: 'muted' }, 'Nothing has been imported yet.'),
+      el('h2', { style: 'margin-top:24px' }, `Forhåndsvisning: ${data.filename}`),
+      el('p', { class: 'muted' }, 'Intet er importeret endnu.'),
       ...sections,
       el('div', { class: 'actions' }, importBtn, cancelBtn, ack),
     );
   }
 
   function renderResult(data) {
-    const again = el('button', {}, 'Import another file');
+    const again = el('button', {}, 'Importér en fil mere');
     again.addEventListener('click', () => { resultEl.replaceChildren(); fileInput.click(); });
     resultEl.replaceChildren(
-      el('h2', { style: 'margin-top:24px' }, `Imported: ${data.filename}`),
+      el('h2', { style: 'margin-top:24px' }, `Importeret: ${data.filename}`),
       ...data.accounts.map((a) => accountSection(a, false)),
       el('div', { class: 'actions' }, again),
     );
   }
 
   function accountSection(a, isPreview) {
-    const title = a.actualAccount ? `${a.actualAccount}` : 'Unmapped account';
+    const title = a.actualAccount ? `${a.actualAccount}` : 'Konto uden tilknytning';
     const card = el('div', { class: 'card' },
       el('h2', {}, title),
-      el('div', { class: 'muted' }, `Bank account ${a.bankAccount}` +
-        (a.rowCount ? ` · ${a.rowCount} rows · ${a.dateFrom} to ${a.dateTo}` : '')));
+      el('div', { class: 'muted' }, `Bankkonto ${a.bankAccount}` +
+        (a.rowCount ? ` · ${a.rowCount} ${a.rowCount === 1 ? 'række' : 'rækker'} ·${a.dateFrom} til ${a.dateTo}` : '')));
 
     if (a.error) {
-      card.append(el('div', { class: 'error' }, a.error, ' Nothing from this account will be imported.'));
+      card.append(el('div', { class: 'error' }, a.error, ' Intet fra denne konto bliver importeret.'));
     } else {
       card.append(el('div', { class: 'counts' },
-        count(isPreview ? 'to add' : 'added', a.added, 'ok'),
-        count('already imported', a.alreadyImported),
-        count(isPreview ? 'to update' : 'updated', a.updated)));
+        count(isPreview ? 'tilføjes' : 'tilføjet', a.added, 'ok'),
+        count('allerede importeret', a.alreadyImported),
+        count(isPreview ? 'opdateres' : 'opdateret', a.updated)));
     }
     for (const e of a.errors) card.append(el('div', { class: 'error' }, e));
     for (const w of a.warnings) {
       card.append(el('div', { class: 'warning' },
-        `Balance jump at line ${w.lineNo} (${w.date}): expected ${fmt(w.expectedBalance)}, bank says ${fmt(w.actualBalance)}. ` +
-        'Rows are probably missing from the export before this line.'));
+        `Saldospring ved linje ${w.lineNo} (${w.date}): forventet ${fmt(w.expectedBalance)}, banken siger ${fmt(w.actualBalance)}. ` +
+        'Der mangler sandsynligvis rækker i eksporten før denne linje.'));
     }
     if (a.rejects.length) {
-      card.append(el('div', { class: 'error' }, `${a.rejects.length} line(s) rejected and will not be imported:`, rejectList(a.rejects)));
+      card.append(el('div', { class: 'error' }, `${a.rejects.length} linje(r) afvist og bliver ikke importeret:`, rejectList(a.rejects)));
     }
     if (!a.error && a.rowsToAdd.length) {
       card.append(el('details', { open: '' },
-        el('summary', {}, isPreview ? 'Rows to add' : 'Rows added'),
+        el('summary', {}, isPreview ? 'Rækker der tilføjes' : 'Tilføjede rækker'),
         el('div', { class: 'scroll' }, el('table', {},
-          el('thead', {}, el('tr', {}, el('th', {}, 'Date'), el('th', {}, 'Payee'), el('th', { class: 'num' }, 'Amount'), el('th', {}, 'Notes'))),
+          el('thead', {}, el('tr', {}, el('th', {}, 'Dato'), el('th', {}, 'Modtager'), el('th', { class: 'num' }, 'Beløb'), el('th', {}, 'Noter'))),
           el('tbody', {}, a.rowsToAdd.map((r) => el('tr', {},
             el('td', { class: 'date' }, r.date), el('td', {}, r.payee),
             el('td', { class: 'num' }, fmt(r.amount)), el('td', {}, r.notes))))))));
@@ -207,7 +207,7 @@
 
   function rejectList(rejects) {
     return el('table', {}, el('tbody', {}, rejects.map((r) => el('tr', {},
-      el('td', { class: 'num' }, `line ${r.lineNo}`),
+      el('td', { class: 'num' }, `linje ${r.lineNo}`),
       el('td', {}, r.reason, el('pre', {}, r.raw))))));
   }
 </script>
