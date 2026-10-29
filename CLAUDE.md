@@ -90,6 +90,11 @@ imports the exact same parsed batch (never re-parses), then syncs.
   `src/importer.ts`).
 - Rejected lines with an unknown account (wrong field count) get their own
   section instead of being guessed into an account.
+- `CREATE_MISSING_ACCOUNTS=true` (off by default, meant for a test budget)
+  creates accounts that `accounts.json` names but Actual lacks, on import only;
+  the preview just says so. The starting balance is the oldest row's balance
+  minus its amount. Actual dates it today, so it is moved to the oldest row's
+  date (`createAccount` in `src/importer.ts`).
 - Import options: `payeeNameNormalization: 'original'` keeps the bank's exact
   text for rules; `reimportDeleted: false` keeps deletions in Actual.
 - All Actual calls go through one mutex: the API is a process-wide singleton.

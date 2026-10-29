@@ -22,6 +22,7 @@ Only Docker is needed.
    | `ACTUAL_PASSWORD` | yes | Actual server password |
    | `ACTUAL_SYNC_ID` | yes | Actual → Settings → Advanced settings → Sync ID |
    | `ACTUAL_E2E_PASSWORD` | no | Only if end-to-end encryption is turned on |
+   | `CREATE_MISSING_ACCOUNTS` | no | `true` creates accounts named in `accounts.json` that the budget doesn't have, with the bank's starting balance. Meant for a test budget; leave unset for the real one |
    | `DATA_PATH` | no | Host folder for `/data`. Default `./data` |
 
 2. Create the data folder with your account mapping, and make it writable by
