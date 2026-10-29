@@ -110,21 +110,21 @@ export function parseAmountToOre(value: string): number {
   // Decimal comma variant: `.` is a thousands separator, `,` the decimal point.
   if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
   const m = /^([+-]?)(\d+)(?:\.(\d{1,2}))?$/.exec(s);
-  if (!m) throw new LineError(`not a number: "${value.trim()}"`);
+  if (!m) throw new LineError(`ikke et tal: "${value.trim()}"`);
   const kroner = Number(m[2]);
   const ore = kroner * 100 + Number((m[3] ?? '').padEnd(2, '0'));
-  if (!Number.isSafeInteger(ore)) throw new LineError(`number too large: "${value.trim()}"`);
+  if (!Number.isSafeInteger(ore)) throw new LineError(`tallet er for stort: "${value.trim()}"`);
   return m[1] === '-' ? -ore || 0 : ore; // `|| 0` turns -0 into 0
 }
 
 /** `dd-mm-yyyy` -> `yyyy-mm-dd`, rejecting impossible dates like 31-02-2026. */
 export function parseDate(value: string): string {
   const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
-  if (!m) throw new LineError(`invalid date: "${value}"`);
+  if (!m) throw new LineError(`ugyldig dato: "${value}"`);
   const [, dd, mm, yyyy] = m;
   const d = new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd)));
   if (d.getUTCFullYear() !== Number(yyyy) || d.getUTCMonth() !== Number(mm) - 1 || d.getUTCDate() !== Number(dd)) {
-    throw new LineError(`invalid date: "${value}"`);
+    throw new LineError(`ugyldig dato: "${value}"`);
   }
   return `${yyyy}-${mm}-${dd}`;
 }
@@ -136,13 +136,13 @@ function readHeader(line: string): Column[] | null {
 
   const unknown = names.filter((n) => !(n in HEADERS));
   if (unknown.length > 0) {
-    throw new UploadError(`Unknown column(s) in header: ${unknown.map((n) => `"${n}"`).join(', ')}.`);
+    throw new UploadError(`Ukendte kolonner i overskriftslinjen: ${unknown.map((n) => `"${n}"`).join(', ')}.`);
   }
   const cols = names.map((n) => HEADERS[n as keyof typeof HEADERS]);
   const missing = REQUIRED.filter((c) => !cols.includes(c));
   if (missing.length > 0) {
     const bankNames = missing.map((c) => Object.keys(HEADERS).find((k) => HEADERS[k as keyof typeof HEADERS] === c));
-    throw new UploadError(`Export is missing required column(s): ${bankNames.join(', ')}.`);
+    throw new UploadError(`Eksporten mangler påkrævede kolonner: ${bankNames.join(', ')}.`);
   }
   return cols;
 }
@@ -150,7 +150,7 @@ function readHeader(line: string): Column[] | null {
 function parseLine(line: string, cols: Column[], lineNo: number): ParsedRow {
   const parts = splitLine(line);
   if (parts.length !== cols.length) {
-    throw new LineError(`expected ${cols.length} fields, got ${parts.length} (a ';' inside the text?)`);
+    throw new LineError(`forventede ${cols.length} felter, fik ${parts.length} (et ';' inde i teksten?)`);
   }
   const f: Record<string, string> = {};
   cols.forEach((name, i) => (f[name] = cleanField(parts[i])));
@@ -179,7 +179,7 @@ export function parseBecCsv(bytes: Buffer): ParseResult {
   const lines = decodeExport(bytes).split(/\r\n|\n|\r/);
 
   const firstContent = lines.findIndex((l) => l.trim() !== '');
-  if (firstContent === -1) throw new UploadError('The file is empty.');
+  if (firstContent === -1) throw new UploadError('Filen er tom.');
 
   const header = readHeader(lines[firstContent]);
   const cols = header ?? DEFAULT_COLUMNS;
@@ -194,7 +194,7 @@ export function parseBecCsv(bytes: Buffer): ParseResult {
     const lineNo = i + 1;
     try {
       const row = parseLine(line, cols, lineNo);
-      if (!row.account) throw new LineError('missing Exportkonto');
+      if (!row.account) throw new LineError('mangler Exportkonto');
       const list = accounts.get(row.account) ?? [];
       list.push(row);
       accounts.set(row.account, list);
@@ -204,7 +204,7 @@ export function parseBecCsv(bytes: Buffer): ParseResult {
     }
   }
 
-  if (accounts.size === 0 && rejects.length === 0) throw new UploadError('The file contains no transactions.');
+  if (accounts.size === 0 && rejects.length === 0) throw new UploadError('Filen indeholder ingen transaktioner.');
 
   return { accounts, rejects, warnings: checkBalances(accounts) };
 }

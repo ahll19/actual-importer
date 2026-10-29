@@ -1,0 +1,26 @@
+# Runs the tests, the typecheck and the test-docs check on every PR and on
+# pushes to main. Uses fake data only; never talks to a real Actual server.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      # --ignore-scripts: same as local (see CLAUDE.md → Commands).
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run check:test-docs

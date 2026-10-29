@@ -84,17 +84,17 @@ export async function runBatch(
 
     const name = accountMap[bankAccount];
     if (name === undefined) {
-      report.error = `No mapping for bank account ${bankAccount} in accounts.json.`;
+      report.error = `Bankkonto ${bankAccount} er ikke knyttet til en Actual-konto i accounts.json.`;
       continue;
     }
     report.actualAccount = name;
     const target = actualAccounts.find((a) => a.name === name);
     if (!target) {
-      report.error = `Actual has no account named "${name}".`;
+      report.error = `Actual har ingen konto med navnet "${name}".`;
       continue;
     }
     if (target.closed) {
-      report.error = `Actual account "${name}" is closed.`;
+      report.error = `Actual-kontoen "${name}" er lukket.`;
       continue;
     }
 
@@ -107,7 +107,7 @@ export async function runBatch(
       report.errors = (result.errors ?? []).map((e) => e.message);
       report.rowsToAdd = rowsToAdd(transactions, result);
     } catch (err) {
-      report.error = `Actual rejected the import: ${(err as Error).message}`;
+      report.error = `Actual afviste importen: ${(err as Error).message}`;
     }
   }
 

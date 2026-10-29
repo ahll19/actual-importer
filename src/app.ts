@@ -64,11 +64,11 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     try {
       file = await req.file();
     } catch {
-      return reply.code(400).send({ error: 'Expected a multipart file upload.' });
+      return reply.code(400).send({ error: 'Forventede en fil-upload.' });
     }
-    if (!file) return reply.code(400).send({ error: 'No file uploaded.' });
+    if (!file) return reply.code(400).send({ error: 'Der blev ikke uploadet nogen fil.' });
     if (!file.filename.toLowerCase().endsWith('.csv')) {
-      return reply.code(400).send({ error: 'Only .csv files are accepted.' });
+      return reply.code(400).send({ error: 'Kun .csv-filer kan bruges.' });
     }
 
     let bytes: Buffer;
@@ -76,7 +76,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
       bytes = await file.toBuffer();
     } catch (err) {
       if (err instanceof app.multipartErrors.RequestFileTooLargeError) {
-        return reply.code(413).send({ error: 'File is larger than 5 MB.' });
+        return reply.code(413).send({ error: 'Filen er større end 5 MB.' });
       }
       throw err;
     }
@@ -108,7 +108,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     const token = req.body?.token;
     const batch = typeof token === 'string' ? store.get(token) : undefined;
     if (!batch) {
-      return reply.code(410).send({ error: 'This preview has expired (15 minutes) or was already imported. Upload the file again.' });
+      return reply.code(410).send({ error: 'Forhåndsvisningen er udløbet (efter 15 minutter) eller allerede importeret. Upload filen igen.' });
     }
 
     let report: BatchReport;

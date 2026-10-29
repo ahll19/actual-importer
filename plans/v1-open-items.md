@@ -7,5 +7,5 @@ The v1 spec is implemented. Nothing is known to be broken. Still to do:
    server). Start with the dry run (see CLAUDE.md → Commands).
 2. Install Dockge on TrueNAS, deploy the stack, and set up the reverse proxy
    host (README).
-3. Translate the page and the error messages it shows to Danish (they are
-   English today).
+3. ~~Translate the page and the error messages it shows to Danish.~~ Done.
+   Startup errors (missing environment variables) and logs stay English.

@@ -87,7 +87,7 @@ export class ActualClient {
     } catch (err) {
       this.lastConnectionOk = false;
       await this.disconnect();
-      throw new Error(`Could not connect to Actual at ${this.config.serverURL}: ${(err as Error).message}`);
+      throw new Error(`Kunne ikke forbinde til Actual på ${this.config.serverURL}: ${(err as Error).message}`);
     }
   }
 

@@ -69,7 +69,7 @@ describe('parseBecCsv', () => {
     const result = parseBecCsv(file(HEADER, ROW1, bad, ROW3));
     expect(result.rejects).toHaveLength(1);
     expect(result.rejects[0]).toMatchObject({ lineNo: 3, raw: bad, account: undefined });
-    expect(result.rejects[0].reason).toMatch(/^expected 10 fields, got 11/);
+    expect(result.rejects[0].reason).toMatch(/^forventede 10 felter, fik 11/);
     expect(result.accounts.get(ACCOUNT)).toHaveLength(2);
   });
 
@@ -77,13 +77,13 @@ describe('parseBecCsv', () => {
     const bad = ROW1.replace('03-08-2026', '31-02-2026');
     const result = parseBecCsv(file(HEADER, bad));
     expect(result.rejects[0]).toMatchObject({ lineNo: 2, account: ACCOUNT });
-    expect(result.rejects[0].reason).toMatch(/invalid date/);
+    expect(result.rejects[0].reason).toMatch(/ugyldig dato/);
   });
 
   it('rejects a non-numeric amount', () => {
     const bad = ROW1.replace('-29.00', 'abc');
     const result = parseBecCsv(file(HEADER, bad, ROW2));
-    expect(result.rejects[0].reason).toMatch(/not a number/);
+    expect(result.rejects[0].reason).toMatch(/ikke et tal/);
     expect(result.accounts.get(ACCOUNT)).toHaveLength(1);
   });
 
@@ -118,7 +118,7 @@ describe('parseBecCsv', () => {
 
   it('fails the whole upload when a required column is missing', () => {
     const header = '"Exportkonto";"Dato";"Tekst";"Beløb";';
-    expect(() => parseBecCsv(file(header))).toThrow(/missing required column\(s\): Saldo/);
+    expect(() => parseBecCsv(file(header))).toThrow(/mangler påkrævede kolonner: Saldo/);
   });
 
   it('fails on an empty file', () => {
