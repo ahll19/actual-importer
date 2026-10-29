@@ -1,5 +1,9 @@
 # Spec: CSV upload importer for Actual Budget (BEC Netbank)
 
+> **Archived.** This is the original v1 spec, kept for history. The code is
+> the source of truth. Deployment has changed since: the app runs as a Dockge
+> stack (see README), not a TrueNAS custom app.
+
 Build a small LAN-only web service. A user drops a bank CSV export on a page,
 sees a preview of what will happen, clicks **Import**, and the transactions land
 in the right accounts in a self-hosted Actual Budget server.
@@ -11,13 +15,13 @@ find in the current `@actual-app/api` docs, stop and ask instead of guessing.
 
 - **Actual Budget** server v26.10.0, running as a TrueNAS SCALE catalog app on
   the LAN, reached at `https://budget.example.com` through Nginx Proxy Manager
-  (`lan-proxy`) with a valid wildcard certificate and local DNS. End-to-end
+  (LAN-only) with a valid wildcard certificate and local DNS. End-to-end
   encryption is **off**. Envelope budgeting. One shared budget file.
 - **Bank**: Netbank on the BEC
   platform. Transactions are exported manually via
   *Konti og posteringer → Gem posteringer som fil* as CSV.
 - **Deployment target**: a TrueNAS SCALE custom app (Docker container) on the
-  same server as Actual, exposed LAN-only through `lan-proxy` on its own hostname.
+  same server as Actual, exposed LAN-only through the LAN reverse proxy on its own hostname.
 - **Access**: anyone on the LAN. No app login. Never exposed to the internet.
 - The owner maintains this himself afterwards. Prefer plain, readable code over
   clever abstractions, and explain non-obvious decisions in comments.
@@ -113,7 +117,7 @@ Example rows (account numbers and names are fake):
 "11112222333344";"11112222333344";"55556666777788";03-08-2026;"Til Ønskeopsparing p";-250.00; 13245.52;"Test Person Testvej 1 1234 Testrup ";"";"Fra Testkonto";
 ```
 
-A working Python reference implementation of this parser (`bec2actual.py`) is
+A working Python reference implementation of this parser (`bec2actual.py`, since deleted) is
 in the appendix. Port its behaviour, not necessarily its structure.
 
 ## Mapping to Actual transactions
@@ -206,9 +210,9 @@ Call `shutdown()` on SIGTERM.
 - `compose.yaml` suitable for a TrueNAS SCALE **custom app (YAML)**: one
   service, a host-path volume for `/data` (`accounts.json` + Actual cache),
   env vars as above, `restart: unless-stopped`, port mapping.
-- README section for `lan-proxy`: proxy host e.g. `budget-import.example.com` →
+- README section for the LAN reverse proxy: proxy host e.g. `budget-import.example.com` →
   container port, wildcard cert, Force SSL, and a local DNS record pointing
-  the name at `lan-proxy`. No WAN exposure.
+  the name at the proxy. No WAN exposure.
 - README section "Updating Actual": bump `@actual-app/api` to the server's new
   version, rebuild, redeploy.
 
@@ -243,7 +247,7 @@ real server using env vars, for manual verification.
 - `docker compose up` gives a working page on the LAN.
 - Uploading a real export shows a correct preview, importing adds the rows,
   and uploading the same file again shows everything as already imported.
-- Tests pass, README covers setup, config, lan-proxy and updating.
+- Tests pass, README covers setup, config, reverse proxy and updating.
 
 ---
 
