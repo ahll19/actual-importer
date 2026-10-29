@@ -1,6 +1,6 @@
 # Testing findings (running tally)
 
-Bugs and observations from manual testing. Items 3 and 4 are still open.
+Bugs and observations from manual testing. All items are fixed on `fix/testing-findings`.
 
 ## 1. Drag and drop does not work (Firefox)
 
@@ -66,7 +66,10 @@ ISO option is always UTC, so this needs `TZ=Europe/Copenhagen` in
 `Actual har ingen konto med navnet "..."`. Easy to think the new setting is
 broken when it is just not turned on.
 
-**Idea:** add a hint to that message, e.g. that the account can be created
+**Status:** fixed: the message now says the account can be created
+in Actual, or automatically with `CREATE_MISSING_ACCOUNTS=true`.
+
+**Idea was:** add a hint to that message, e.g. that the account can be created
 in Actual, or created automatically with `CREATE_MISSING_ACCOUNTS=true`.
 
 ## 4. Missing space in the account line
@@ -75,6 +78,8 @@ in Actual, or created automatically with `CREATE_MISSING_ACCOUNTS=true`.
 
 **Cause:** `public/index.html`, `accountSection`: `` ` ·${a.dateFrom}` `` lacks
 a space before `${a.dateFrom}`.
+
+**Status:** fixed.
 
 ## 5. Result page repeats every imported row
 

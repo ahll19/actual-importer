@@ -186,7 +186,7 @@
     const card = el('div', { class: 'card' },
       el('h2', {}, title),
       el('div', { class: 'muted' }, `Bankkonto ${a.bankAccount}` +
-        (a.rowCount ? ` · ${a.rowCount} ${a.rowCount === 1 ? 'række' : 'rækker'} ·${a.dateFrom} til ${a.dateTo}` : '')));
+        (a.rowCount ? ` · ${a.rowCount} ${a.rowCount === 1 ? 'række' : 'rækker'} · ${a.dateFrom} til ${a.dateTo}` : '')));
 
     if (a.newAccount) {
       const start = `startsaldo ${fmt(a.newAccount.startingBalance)} pr. ${a.newAccount.startingDate}`;

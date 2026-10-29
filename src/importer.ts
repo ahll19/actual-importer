@@ -123,7 +123,9 @@ export async function runBatch(
       continue;
     }
     if (!target) {
-      report.error = `Actual har ingen konto med navnet "${name}".`;
+      report.error =
+        `Actual har ingen konto med navnet "${name}". Opret den i Actual, ` +
+        'eller sæt CREATE_MISSING_ACCOUNTS=true, så importen opretter den.';
       continue;
     }
     if (target.closed) {
