@@ -16,9 +16,9 @@ Install dependencies (first time, and after `package-lock.json` changes):
 
 `docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app:z -w /app node:24-bookworm-slim npm ci --ignore-scripts`
 
-Tests and typecheck (run both before saying a change is done):
+Tests, typecheck and test-docs check (run all three before saying a change is done; CI runs the same on every PR):
 
-`docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app:z -w /app node:24-bookworm-slim sh -c "npm test && npm run typecheck"`
+`docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app:z -w /app node:24-bookworm-slim sh -c "npm test && npm run typecheck && npm run check:test-docs"`
 
 One test file: same command with `npx vitest run test/parser.test.ts`.
 
@@ -49,7 +49,9 @@ has a compiler toolchain for that reason.
 | `src/accounts.ts` | Reads `accounts.json` (bank account number → Actual account name) |
 | `src/app.ts`, `src/server.ts` | HTTP routes (`/`, `/preview`, `/import`, `/healthz`) and entry point |
 | `scripts/dry-run.ts` | Manual dry run against a real server, not part of `npm test` |
-| `test/` | Vitest tests; fixtures are built as cp1252 bytes in `test/helpers.ts` |
+| `test/` | Vitest tests; fixtures are built as cp1252 bytes in `test/helpers.ts`. `test/README.md` documents every test |
+| `scripts/check-test-docs.ts` | Fails if a test is missing from `test/README.md` (run in CI) |
+| `.github/workflows/ci.yml` | CI: tests, typecheck and test-docs check on every PR and push to `main` |
 | `plans/` | Plans and open work. Plans go here, not in this file |
 | `.archive/` | The original v1 spec, kept for history only. The code wins where they differ |
 
@@ -104,6 +106,10 @@ imports the exact same parsed batch (never re-parses), then syncs.
 
 - Work on a branch and open a PR. Ask before every commit, push or PR.
 - Ask before adding or upgrading any dependency.
+- **Describe test changes and wait for approval before making them.** This
+  covers adding, changing or removing a test, its assertions or its fixtures.
+  For each test, say what changes and why. Every test must stay documented in
+  `test/README.md` (CI checks this), so update that file in the same change.
 - The dry run against the real server is fine without asking. Ask before
   anything else that touches the real Actual server or the deployment.
 - When a change affects setup or deployment, update `README.md`. When it

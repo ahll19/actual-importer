@@ -12,7 +12,8 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dry-run": "tsx scripts/dry-run.ts"
+    "dry-run": "tsx scripts/dry-run.ts",
+    "check:test-docs": "tsx scripts/check-test-docs.ts"
   },
   "dependencies": {
     "@actual-app/api": "26.10.0",
