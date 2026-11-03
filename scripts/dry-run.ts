@@ -26,12 +26,12 @@ const accountMap = await loadAccountMap(config.accountsFile);
 const client = new ActualClient(config.actual);
 
 try {
-  const report = await client.withBudget((api) => runBatch(api, parsed, accountMap, true));
+  const report = await client.withBudget((api) => runBatch(api, parsed, accountMap, true, { createMissingAccounts: config.createMissingAccounts }));
   for (const a of report.accounts) {
     console.log(
       a.error
         ? `${a.actualAccount ?? 'unmapped account'}: ERROR ${a.error.replace(/\d{6,}/g, '<account>')}`
-        : `${a.actualAccount}: ${a.rowCount} rows (${a.dateFrom}..${a.dateTo}), ` +
+        : `${a.actualAccount}${a.newAccount ? ' (would be created)' : ''}: ${a.rowCount} rows (${a.dateFrom}..${a.dateTo}), ` +
             `${a.added} to add, ${a.updated} to update, ${a.alreadyImported} already imported, ` +
             `${a.rejects.length} rejected, ${a.warnings.length} balance warnings, ${a.errors.length} errors`,
     );

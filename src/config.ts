@@ -6,6 +6,8 @@ import type { ActualConfig } from './actual.js';
 export interface Config {
   port: number;
   accountsFile: string;
+  /** Create Actual accounts named in accounts.json that don't exist yet. Off by default. */
+  createMissingAccounts: boolean;
   actual: ActualConfig;
 }
 
@@ -21,6 +23,7 @@ export function loadConfig(): Config {
     port: Number(process.env.PORT || 3000),
     // Next to the Actual cache on the persistent volume unless overridden.
     accountsFile: process.env.ACCOUNTS_FILE || path.join(path.dirname(dataDir), 'accounts.json'),
+    createMissingAccounts: process.env.CREATE_MISSING_ACCOUNTS === 'true',
     actual: {
       serverURL: required('ACTUAL_SERVER_URL'),
       password: required('ACTUAL_PASSWORD'),

@@ -25,6 +25,10 @@ function fakeApi(existing: string[] = []) {
         errors: [],
       };
     }),
+    createAccount: vi.fn<ActualApi['createAccount']>(async () => 'acc-new'),
+    // A brand-new account only holds its starting balance transaction.
+    getTransactions: vi.fn<ActualApi['getTransactions']>(async () => [{ id: 'start-tx' }]),
+    updateTransaction: vi.fn<ActualApi['updateTransaction']>(async () => undefined),
   };
   return api;
 }
@@ -74,6 +78,43 @@ describe('runBatch', () => {
     const batch = parseBecCsv(file(HEADER, ROW1));
     const report = await runBatch(fakeApi(), batch, { [ACCOUNT]: 'Gammel' }, true);
     expect(report.accounts[0].error).toMatch(/lukket/);
+  });
+
+  it('previews a missing account as new when account creation is on', async () => {
+    const batch = parseBecCsv(file(HEADER, ROW1, ROW2, ROW3));
+    const api = fakeApi();
+    const report = await runBatch(api, batch, { [ACCOUNT]: 'Ny konto' }, true, { createMissingAccounts: true });
+
+    const a = report.accounts[0];
+    expect(a.error).toBeNull();
+    expect(a.added).toBe(3);
+    expect(a.rowsToAdd).toHaveLength(3);
+    // ROW1 is the oldest: balance 13230.96 after -29.00.
+    expect(a.newAccount).toEqual({ startingBalance: 1325996, startingDate: '2026-08-03' });
+    expect(api.createAccount).not.toHaveBeenCalled();
+    expect(api.importTransactions).not.toHaveBeenCalled();
+  });
+
+  it('creates a missing account on import, then imports into it', async () => {
+    const batch = parseBecCsv(file(HEADER, ROW1, ROW2, ROW3));
+    const api = fakeApi();
+    const report = await runBatch(api, batch, { [ACCOUNT]: 'Ny konto' }, false, { createMissingAccounts: true });
+
+    expect(report.accounts[0].error).toBeNull();
+    expect(report.accounts[0].added).toBe(3);
+    expect(api.createAccount).toHaveBeenCalledWith({ name: 'Ny konto', offbudget: false }, 1325996);
+    // Actual dates the starting balance today; it is moved to the oldest row's date.
+    expect(api.updateTransaction).toHaveBeenCalledWith('start-tx', { date: '2026-08-03' });
+    expect(api.importTransactions).toHaveBeenCalledWith('acc-new', expect.any(Array), expect.objectContaining({ dryRun: false }));
+  });
+
+  it('takes the starting balance from the oldest row in a newest-first export', async () => {
+    const newer = '"11112222333344";"";"";05-08-2026;"Nyere";-10.00;90.00;"";"";"";';
+    const older = '"11112222333344";"";"";04-08-2026;"Ældre";50.00;100.00;"";"";"";';
+    const batch = parseBecCsv(file(HEADER, newer, older));
+    const report = await runBatch(fakeApi(), batch, { [ACCOUNT]: 'Ny konto' }, true, { createMissingAccounts: true });
+    // Balance before the older row: 100.00 - 50.00.
+    expect(report.accounts[0].newAccount).toEqual({ startingBalance: 5000, startingDate: '2026-08-04' });
   });
 
   it('puts rejects under their account, or in the unassigned list', async () => {

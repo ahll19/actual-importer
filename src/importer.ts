@@ -27,6 +27,14 @@ export interface ActualApi {
     transactions: Array<ReturnType<typeof toActualTransaction> & { account: string }>,
     opts: { dryRun: boolean; payeeNameNormalization: 'original'; reimportDeleted: boolean },
   ): Promise<ImportResult>;
+  createAccount(account: { name: string; offbudget: boolean }, initialBalance: number): Promise<string>;
+  getTransactions(accountId: string, startDate: string, endDate: string): Promise<Array<{ id: string }>>;
+  updateTransaction(id: string, fields: { date: string }): Promise<unknown>;
+}
+
+export interface RunOptions {
+  /** Create Actual accounts that accounts.json names but Actual doesn't have. */
+  createMissingAccounts?: boolean;
 }
 
 export interface PreviewRow {
@@ -53,6 +61,11 @@ export interface AccountReport {
   rejects: RejectedLine[];
   /** Rows that would be / were added. */
   rowsToAdd: PreviewRow[];
+  /**
+   * Set when the Actual account doesn't exist and will be (preview) or was
+   * (import) created. Shown on the page, never logged.
+   */
+  newAccount: { startingBalance: number; startingDate: string } | null;
 }
 
 export interface BatchReport {
@@ -74,6 +87,7 @@ export async function runBatch(
   batch: ParseResult,
   accountMap: AccountMap,
   dryRun: boolean,
+  { createMissingAccounts = false }: RunOptions = {},
 ): Promise<BatchReport> {
   const actualAccounts = await api.getAccounts();
   const reports: AccountReport[] = [];
@@ -89,8 +103,29 @@ export async function runBatch(
     }
     report.actualAccount = name;
     const target = actualAccounts.find((a) => a.name === name);
+    if (!target && createMissingAccounts) {
+      report.newAccount = startingBalance(rows);
+      if (dryRun) {
+        // Nothing to compare against yet: every row is new.
+        report.added = rows.length;
+        report.rowsToAdd = rows.map((row) => {
+          const t = toActualTransaction(row);
+          return { date: t.date, payee: t.payee_name, amount: t.amount, notes: t.notes ?? '' };
+        });
+        continue;
+      }
+      try {
+        const id = await createAccount(api, name, report.newAccount);
+        await importRows(api, id, rows, false, report);
+      } catch (err) {
+        report.error = `Kunne ikke oprette Actual-kontoen "${name}": ${(err as Error).message}`;
+      }
+      continue;
+    }
     if (!target) {
-      report.error = `Actual har ingen konto med navnet "${name}".`;
+      report.error =
+        `Actual har ingen konto med navnet "${name}". Opret den i Actual, ` +
+        'eller sæt CREATE_MISSING_ACCOUNTS=true, så importen opretter den.';
       continue;
     }
     if (target.closed) {
@@ -98,14 +133,8 @@ export async function runBatch(
       continue;
     }
 
-    const transactions = rows.map((row) => ({ ...toActualTransaction(row), account: target.id }));
     try {
-      const result = await api.importTransactions(target.id, transactions, { dryRun, ...IMPORT_OPTS });
-      report.added = result.added.length;
-      report.updated = result.updated.length;
-      report.alreadyImported = rows.length - report.added - report.updated;
-      report.errors = (result.errors ?? []).map((e) => e.message);
-      report.rowsToAdd = rowsToAdd(transactions, result);
+      await importRows(api, target.id, rows, dryRun, report);
     } catch (err) {
       report.error = `Actual afviste importen: ${(err as Error).message}`;
     }
@@ -121,6 +150,42 @@ export async function runBatch(
   }
 
   return { accounts: reports, unassignedRejects: batch.rejects.filter((r) => !r.account) };
+}
+
+async function importRows(api: ActualApi, accountId: string, rows: ParsedRow[], dryRun: boolean, report: AccountReport) {
+  const transactions = rows.map((row) => ({ ...toActualTransaction(row), account: accountId }));
+  const result = await api.importTransactions(accountId, transactions, { dryRun, ...IMPORT_OPTS });
+  report.added = result.added.length;
+  report.updated = result.updated.length;
+  report.alreadyImported = rows.length - report.added - report.updated;
+  report.errors = (result.errors ?? []).map((e) => e.message);
+  report.rowsToAdd = rowsToAdd(transactions, result);
+}
+
+/**
+ * The balance before the oldest row of the export, so the new account ends up
+ * with the same balance as the bank. Rows are expected oldest first (the
+ * running-balance check relies on that too), but if the last row has the
+ * earlier date the file is newest first, so use that end instead.
+ */
+function startingBalance(rows: ParsedRow[]): { startingBalance: number; startingDate: string } {
+  const last = rows[rows.length - 1];
+  const oldest = last.date < rows[0].date ? last : rows[0];
+  return { startingBalance: oldest.balance - oldest.amount, startingDate: oldest.date };
+}
+
+/**
+ * Creates an on-budget account with a starting balance. Actual dates the
+ * starting balance transaction today, which would put it after the imported
+ * rows, so it is moved to the date of the oldest row. A brand-new account has
+ * no other transactions, so everything found is the starting balance.
+ */
+async function createAccount(api: ActualApi, name: string, start: { startingBalance: number; startingDate: string }) {
+  const id = await api.createAccount({ name, offbudget: false }, start.startingBalance);
+  for (const t of await api.getTransactions(id, '1900-01-01', '2999-12-31')) {
+    await api.updateTransaction(t.id, { date: start.startingDate });
+  }
+  return id;
 }
 
 function emptyReport(bankAccount: string, rows: ParsedRow[], batch: ParseResult): AccountReport {
@@ -139,6 +204,7 @@ function emptyReport(bankAccount: string, rows: ParsedRow[], batch: ParseResult)
     warnings: batch.warnings.filter((w) => w.account === bankAccount),
     rejects: batch.rejects.filter((r) => r.account === bankAccount),
     rowsToAdd: [],
+    newAccount: null,
   };
 }
 
