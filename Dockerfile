@@ -10,7 +10,11 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
-RUN npm run build && npm prune --omit=dev
+COPY public ./public
+# Make every file readable by the non-root runtime user. COPY keeps the host's
+# permissions, so a clone made with a strict umask (e.g. as root on TrueNAS)
+# would otherwise leave files only root can read.
+RUN npm run build && npm prune --omit=dev && chmod -R a+rX /app
 
 # --- runtime stage: production dependencies and compiled code only ---
 # Debian (glibc) rather than Alpine so better-sqlite3, used by @actual-app/api,
@@ -23,7 +27,7 @@ WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-COPY public ./public
+COPY --from=build /app/public ./public
 # Fixed non-root UID/GID (568 is the "apps" user on TrueNAS SCALE). The data
 # folder on the host must be writable by it.
 USER 568:568
