@@ -1,5 +1,9 @@
 # actual-importer
 
+> **AI disclaimer:** most of this project's code and documentation was written
+> with an AI assistant (Claude Code) and reviewed by the owner. Read the code
+> before trusting it with your own budget.
+
 A small LAN-only web page that imports CSV exports from Netbank on the BEC
 platform (used by several Danish banks) into a self-hosted [Actual Budget](https://actualbudget.org).
 
@@ -69,32 +73,35 @@ Only Docker is needed.
 `ACTUAL_SERVER_URL` to Actual's address on the LAN instead, e.g.
 `http://<host-ip>:<actual-port>`.
 
-## Reverse proxy (Nginx Proxy Manager)
-
-Give the page its own LAN hostname, e.g. `budget-import.example.com`:
-
-1. In the LAN-only Nginx Proxy Manager: **Hosts → Proxy Hosts → Add Proxy
-   Host**. Scheme `http`, forward to `<docker-host-ip>:3010`. On the SSL tab,
-   pick the wildcard certificate and enable **Force SSL**.
-2. Add a local DNS record for the name pointing at the proxy.
-3. **Don't** add it to the WAN-facing proxy. The page has no login: anyone who
-   can reach it can import into the budget.
-
 ## Updating Actual
 
-The importer must use the same version as the Actual server (currently
-`26.10.0`). When you upgrade Actual:
+The importer only works with the exact Actual version it was built for
+(currently `26.10.0`). So whenever you upgrade Actual, update the importer
+to the same version:
 
-1. Bump the version in this repo (without Node installed):
+1. On any computer with Docker, open a terminal in your copy of this repo.
+2. Set the version you are upgrading Actual to, then run the update command.
+   It runs `npm` inside a throwaway container, so Node doesn't need to be
+   installed:
 
    ```bash
-   docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app:z -w /app node:24-bookworm-slim npm install --package-lock-only --save-exact @actual-app/api@<new version>
+   VERSION=26.11.0
+
+   docker run --rm \
+     --user "$(id -u):$(id -g)" -e HOME=/tmp \
+     -v "$PWD":/app:z -w /app \
+     node:24-bookworm-slim \
+     npm install --package-lock-only --save-exact "@actual-app/api@$VERSION"
    ```
 
-2. Commit `package.json` and `package-lock.json`, then update the stack as
-   above.
-3. Upload a recent export and check that the preview shows everything as
-   already imported.
+3. Check that only `package.json` and `package-lock.json` changed
+   (`git status`), then commit and push them.
+4. Upgrade the Actual server.
+5. Update the importer: `git pull` in the stack folder, then **Update** in
+   Dockge (see [Running in Dockge](#running-in-dockge)). Don't import between
+   steps 4 and 5.
+6. Upload a recent export. The preview should show every row as already
+   imported. Close the page without importing.
 
 ## Good to know
 
@@ -103,5 +110,7 @@ The importer must use the same version as the Actual server (currently
 - **Balance warnings** mean the export is probably missing rows.
 - **Deleted transactions stay deleted**: re-importing doesn't bring back a row
   you deleted in Actual.
+- **There is no login.** Anyone who can reach the page can import into the
+  budget, so keep it on the LAN and never expose it to the internet.
 - **Payee names** are kept exactly as the bank writes them, so Actual rules can
   match on the bank's text.
