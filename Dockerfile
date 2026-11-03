@@ -10,11 +10,14 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
+RUN npm run build && npm prune --omit=dev
 COPY public ./public
-# Make every file readable by the non-root runtime user. COPY keeps the host's
-# permissions, so a clone made with a strict umask (e.g. as root on TrueNAS)
-# would otherwise leave files only root can read.
-RUN npm run build && npm prune --omit=dev && chmod -R a+rX /app
+# Make the files copied from the host readable by the non-root runtime user.
+# COPY keeps the host's permissions, so a clone made with a strict umask (e.g.
+# as root on TrueNAS) would leave files only root can read. node_modules and
+# dist are created in the image and are readable already. Don't chmod them:
+# that copies every file into a new layer and takes many minutes.
+RUN chmod -R a+rX package.json public
 
 # --- runtime stage: production dependencies and compiled code only ---
 # Debian (glibc) rather than Alpine so better-sqlite3, used by @actual-app/api,
