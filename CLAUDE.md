@@ -32,10 +32,11 @@ Bump the Actual API (only together with the server, see Rules):
 
 `docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app:z -w /app node:24-bookworm-slim npm install --package-lock-only --save-exact @actual-app/api@<version>`
 
-`--ignore-scripts` is deliberate: `better-sqlite3` ships prebuilt binaries for
-Linux and macOS (x64 and arm64), and its install script would try to compile
-and fail in the slim image. The Dockerfile's build stage does run scripts and
-has a compiler toolchain for that reason.
+`--ignore-scripts` is deliberate, here and in the Dockerfile: `better-sqlite3`
+ships prebuilt binaries for Linux and macOS (x64 and arm64), but its install
+script compiles SQLite from source anyway. That fails in the slim image (no
+compiler) and took many minutes on TrueNAS, where `npm prune` ran it a second
+time. The image has no compiler toolchain.
 
 ## Layout
 
