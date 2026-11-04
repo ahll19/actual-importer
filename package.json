@@ -16,7 +16,7 @@
     "check:test-docs": "tsx scripts/check-test-docs.ts"
   },
   "dependencies": {
-    "@actual-app/api": "26.10.0",
+    "@actual-app/api": "26.11.0",
     "@fastify/multipart": "^10.1.6",
     "fastify": "^5.12.7",
     "iconv-lite": "^0.7.3"
