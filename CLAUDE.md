@@ -35,8 +35,12 @@ Bump the Actual API (only together with the server, see Rules):
 `--ignore-scripts` is deliberate, here and in the Dockerfile: `better-sqlite3`
 ships prebuilt binaries for Linux and macOS (x64 and arm64), but its install
 script compiles SQLite from source anyway. That fails in the slim image (no
-compiler) and took many minutes on TrueNAS, where `npm prune` ran it a second
-time. The image has no compiler toolchain.
+compiler) and took many minutes on TrueNAS. The image has no compiler toolchain.
+
+Dockerfile rule: never delete, rename or `chmod` files that an earlier layer
+created. On TrueNAS's Docker storage that copies them up one by one and hangs
+the build (seen with `npm prune` and `chmod -R node_modules`). That is why the
+runtime stage runs its own `npm ci --omit=dev` instead of pruning.
 
 ## Layout
 
