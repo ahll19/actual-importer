@@ -1,16 +1,14 @@
 # --- build stage: install everything, compile TypeScript ---
 FROM node:24-bookworm-slim AS build
-# Compiler toolchain in case better-sqlite3 (used by @actual-app/api) has no
-# prebuilt binary for this platform. Only in the build stage.
-RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 make g++ \
- && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+# --ignore-scripts: better-sqlite3 (used by @actual-app/api) ships prebuilt
+# binaries for Linux x64 and arm64, but its install script compiles SQLite from
+# source anyway. That took many minutes on TrueNAS, and npm prune ran it again.
+RUN npm ci --ignore-scripts
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
-RUN npm run build && npm prune --omit=dev
+RUN npm run build && npm prune --omit=dev --ignore-scripts
 COPY public ./public
 # Make the files copied from the host readable by the non-root runtime user.
 # COPY keeps the host's permissions, so a clone made with a strict umask (e.g.
