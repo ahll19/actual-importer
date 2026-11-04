@@ -22,6 +22,7 @@ export interface BudgetRunner {
 export interface AppOptions {
   actual: BudgetRunner;
   accountsFile: string;
+  createMissingAccounts?: boolean;
   store?: BatchStore<Batch>;
   logger?: boolean;
 }
@@ -45,11 +46,23 @@ interface Batch {
 
 const indexHtml = readFileSync(new URL('../public/index.html', import.meta.url));
 
+// Log time as readable Copenhagen local time instead of pino's default epoch
+// milliseconds. The time zone is set here, not via TZ, so the container needs
+// no time zone setup. 'sv-SE' gives the ISO-like "2026-10-29 14:03:12".
+const copenhagenTime = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Europe/Copenhagen',
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+});
+const copenhagenTimestamp = () => `,"time":"${copenhagenTime.format(new Date())}"`;
+
 export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   const { actual, accountsFile } = opts;
+  const runOpts = { createMissingAccounts: opts.createMissingAccounts ?? false };
   const store = opts.store ?? new BatchStore<Batch>();
 
-  const app = Fastify({ logger: opts.logger ?? true, logController: new QuietRequests() });
+  const logger = opts.logger === false ? false : { timestamp: copenhagenTimestamp };
+  const app = Fastify({ logger, logController: new QuietRequests() });
   await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
 
   app.get('/', async (_req, reply) => reply.type('text/html; charset=utf-8').send(indexHtml));
@@ -92,7 +105,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     let report: BatchReport;
     try {
       const accountMap = await loadAccountMap(accountsFile);
-      report = await actual.withBudget((api) => runBatch(api, parsed, accountMap, true));
+      report = await actual.withBudget((api) => runBatch(api, parsed, accountMap, true, runOpts));
     } catch (err) {
       req.log.error(`preview failed: ${(err as Error).message}`);
       return reply.code(502).send({ error: (err as Error).message });
@@ -115,7 +128,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     try {
       // Same parsed batch as the preview; the file is not parsed again.
       const accountMap = await loadAccountMap(accountsFile);
-      report = await actual.withBudget((api) => runBatch(api, batch.parsed, accountMap, false), { syncAfter: true });
+      report = await actual.withBudget((api) => runBatch(api, batch.parsed, accountMap, false, runOpts), { syncAfter: true });
     } catch (err) {
       req.log.error(`import failed: ${(err as Error).message}`);
       return reply.code(502).send({ error: (err as Error).message });
@@ -134,7 +147,7 @@ function summary(report: BatchReport): string {
   const parts = report.accounts.map((a) =>
     a.error
       ? `${a.actualAccount ?? 'unmapped account'}: failed`
-      : `${a.actualAccount}: ${a.rowCount} rows, +${a.added} added, ${a.updated} updated, ${a.alreadyImported} skipped, ` +
+      : `${a.actualAccount}${a.newAccount ? ' (new account)' : ''}: ${a.rowCount} rows, +${a.added} added, ${a.updated} updated, ${a.alreadyImported} skipped, ` +
         `${a.rejects.length} rejected, ${a.warnings.length} warnings, ${a.errors.length} errors`,
   );
   if (report.unassignedRejects.length) parts.push(`${report.unassignedRejects.length} unassigned rejects`);

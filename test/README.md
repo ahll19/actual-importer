@@ -68,6 +68,9 @@ These use a fake Actual API, never a real server.
 | `reports added and already-imported rows per account` | Rows Actual already has are counted as already imported, the rest as to add, and the preview lists the rows to add. Actual is called with dry run, original payee names and `reimportDeleted: false`. |
 | `fails only the account that has no mapping or no Actual account` | An account missing from `accounts.json`, or mapped to a name Actual doesn't have, gets an error, while the other accounts in the same file still go through. |
 | `refuses a closed Actual account` | Nothing is imported into a closed Actual account. |
+| `previews a missing account as new when account creation is on` | With `CREATE_MISSING_ACCOUNTS` on, the preview creates nothing, lists every row as to add, and shows the starting balance (oldest row's balance minus its amount) and its date. |
+| `creates a missing account on import, then imports into it` | The import creates the account on-budget with that starting balance, moves the starting balance to the oldest row's date (Actual dates it today), and imports the rows into the new account. |
+| `takes the starting balance from the oldest row in a newest-first export` | If the export is newest first, the starting balance still comes from the oldest row, not the first line of the file. |
 | `puts rejects under their account, or in the unassigned list` | A rejected line with a known account is shown under that account; one without (wrong field count) goes to the "account unknown" list. |
 
 ### `BatchStore`

@@ -83,11 +83,27 @@
     statusEl.replaceChildren(text ? el('div', { class: cls || 'card muted' }, text) : '');
   }
 
-  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
-  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  // Cancel both dragenter and dragover: the HTML spec picks the drop target
+  // from dragenter, and Firefox is stricter about this than Chrome.
+  for (const type of ['dragenter', 'dragover']) {
+    drop.addEventListener(type, (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      drop.classList.add('over');
+    });
+  }
+  // dragleave also fires when the pointer moves onto the text inside the box;
+  // only un-highlight when it actually leaves the box.
+  drop.addEventListener('dragleave', (e) => {
+    if (!drop.contains(e.relatedTarget)) drop.classList.remove('over');
+  });
   drop.addEventListener('drop', (e) => {
     e.preventDefault(); drop.classList.remove('over');
-    if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]);
+    const file = e.dataTransfer.files[0];
+    if (file) upload(file);
+    // Some browser/file manager combinations (e.g. Firefox on Wayland) can
+    // hand over a link instead of a file. Say so instead of doing nothing.
+    else setStatus('Filen kunne ikke modtages ved at trække den hertil. Klik på feltet og vælg filen i stedet.', 'error');
   });
   fileInput.addEventListener('change', () => { if (fileInput.files[0]) upload(fileInput.files[0]); fileInput.value = ''; });
 
@@ -170,8 +186,14 @@
     const card = el('div', { class: 'card' },
       el('h2', {}, title),
       el('div', { class: 'muted' }, `Bankkonto ${a.bankAccount}` +
-        (a.rowCount ? ` · ${a.rowCount} ${a.rowCount === 1 ? 'række' : 'rækker'} ·${a.dateFrom} til ${a.dateTo}` : '')));
+        (a.rowCount ? ` · ${a.rowCount} ${a.rowCount === 1 ? 'række' : 'rækker'} · ${a.dateFrom} til ${a.dateTo}` : '')));
 
+    if (a.newAccount) {
+      const start = `startsaldo ${fmt(a.newAccount.startingBalance)} pr. ${a.newAccount.startingDate}`;
+      card.append(el('div', { class: 'warning' }, isPreview
+        ? `Kontoen findes ikke i Actual og bliver oprettet ved import (${start}).`
+        : `Kontoen blev oprettet i Actual (${start}).`));
+    }
     if (a.error) {
       card.append(el('div', { class: 'error' }, a.error, ' Intet fra denne konto bliver importeret.'));
     } else {
@@ -189,7 +211,10 @@
     if (a.rejects.length) {
       card.append(el('div', { class: 'error' }, `${a.rejects.length} linje(r) afvist og bliver ikke importeret:`, rejectList(a.rejects)));
     }
-    if (!a.error && a.rowsToAdd.length) {
+    // After an import, only keep the row list for an account Actual reported
+    // errors on. A clean import just shows the counts.
+    const importedCleanly = !isPreview && !a.errors.length;
+    if (!a.error && a.rowsToAdd.length && !importedCleanly) {
       card.append(el('details', { open: '' },
         el('summary', {}, isPreview ? 'Rækker der tilføjes' : 'Tilføjede rækker'),
         el('div', { class: 'scroll' }, el('table', {},

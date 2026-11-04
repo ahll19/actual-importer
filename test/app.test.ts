@@ -36,6 +36,9 @@ describe('HTTP routes', () => {
           errors: [],
         };
       },
+      createAccount: async () => 'acc-new',
+      getTransactions: async () => [],
+      updateTransaction: async () => undefined,
     };
     runner = {
       lastConnectionOk: true,

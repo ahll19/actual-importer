@@ -6,7 +6,7 @@ import { loadConfig } from './config.js';
 
 const config = loadConfig();
 const actual = new ActualClient(config.actual);
-const app = await buildApp({ actual, accountsFile: config.accountsFile });
+const app = await buildApp({ actual, accountsFile: config.accountsFile, createMissingAccounts: config.createMissingAccounts });
 
 // Connect in the background. If Actual is down at startup, /healthz reports it
 // and the next preview tries again.
